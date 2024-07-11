@@ -30,7 +30,7 @@ function waitForElement(selector, parent = document, timeout = 1000) {
    const element = parent.querySelector(selector);
    if (element) {
       p.resolve(element);
-      return p;
+      return p.promise;
    }
 
    const observer = new MutationObserver(function (mutations) {
@@ -55,7 +55,11 @@ function waitForElement(selector, parent = document, timeout = 1000) {
 
    observer.observe(parent, { childList: true, subtree: true });
 
-   return p;
+   return p.promise;
+}
+
+function sleep(ms) {
+   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 let elementsViewWrapperP, elementsViewObserver;
@@ -93,9 +97,14 @@ function patchElementsPanel(element) {
       elementsViewObserver?.disconnect();
       let $ = element.querySelector(".elements-wrap");
       if (!$) {
-         elementsViewWrapperP = waitForElement(".elements-wrap", element, -1);
-         $ = await elementsViewWrapperP.promise;
-         await new Promise(r => setTimeout(r));
+         elementsViewWrapperP = Promise.withResolvers();
+         $ = await Promise.race([
+            elementsViewWrapperP.promise,
+            waitForElement(".elements-wrap", element, -1),
+         ]);
+         while (!$.firstElementChild.shadowRoot) {
+            await Promise.race([elementsViewWrapperP, sleep(100)]);
+         }
       }
       const elementsViewWrapper = $.firstElementChild.shadowRoot;
 
@@ -124,9 +133,14 @@ function patchElementsPanel(element) {
       stylesPanelObserver?.disconnect();
       let $ = element.querySelector(".style-panes-wrapper");
       if (!$) {
-         stylesPanelWrapperP = waitForElement(".style-panes-wrapper", element, -1);
-         $ = await stylesPanelWrapperP.promise;
-         await new Promise(r => setTimeout(r));
+         stylesPanelWrapperP = Promise.withResolvers();
+         $ = await Promise.race([
+            stylesPanelWrapperP.promise,
+            waitForElement(".style-panes-wrapper", element, -1),
+         ]);
+         while (!$.firstElementChild.shadowRoot) {
+            await Promise.race([stylesPanelWrapperP, sleep(100)]);
+         }
       }
       const stylesPanelWrapper = $.firstElementChild.shadowRoot;
 
@@ -160,7 +174,7 @@ async function init() {
          globalThis.REV_MAP = genRevMapCollect(globalThis.MAP);
       });
 
-   const main = await waitForElement(".main-tabbed-pane", document, -1).promise;
+   const main = await waitForElement(".main-tabbed-pane", document, -1);
 
    const elementsPanel = main.querySelector('[aria-label="Elements panel"]');
    if (elementsPanel) {
