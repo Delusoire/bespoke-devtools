@@ -30,7 +30,7 @@ function waitForElement(selector, parent = document, timeout = 1000) {
    const element = parent.querySelector(selector);
    if (element) {
       p.resolve(element);
-      return p.promise;
+      return p;
    }
 
    const observer = new MutationObserver(function (mutations) {
@@ -40,8 +40,8 @@ function waitForElement(selector, parent = document, timeout = 1000) {
             if (element) {
                p.resolve(element);
                observer.disconnect();
-               return;
             }
+            return;
          }
       }
    });
@@ -53,11 +53,13 @@ function waitForElement(selector, parent = document, timeout = 1000) {
       }, timeout);
    }
 
-   return p.promise;
+   observer.observe(parent, { childList: true, subtree: true });
+
+   return p;
 }
 
-let elementsViewObserver;
-let stylesPanelObserver;
+let elementsViewWrapperP, elementsViewObserver;
+let stylesPanelWrapperP, stylesPanelObserver;
 
 function patchElementsPanel(element) {
    function patchElementsViewClassAttribute(node) {
@@ -86,49 +88,67 @@ function patchElementsPanel(element) {
       node.textContent = selector.replaceAll(/\.[_a-zA-Z0-9]{20}\b/g, s => `.${globalThis.MAP_CSS_CLASS(s.slice(1))}`);
    }
 
-   elementsViewObserver?.disconnect();
-   stylesPanelObserver?.disconnect();
+   (async function () {
+      elementsViewWrapperP?.reject();
+      elementsViewObserver?.disconnect();
+      let $ = element.querySelector(".elements-wrap");
+      if (!$) {
+         elementsViewWrapperP = waitForElement(".elements-wrap", element, -1);
+         $ = await elementsViewWrapperP.promise;
+         await new Promise(r => setTimeout(r));
+      }
+      const elementsViewWrapper = $.firstElementChild.shadowRoot;
 
-   const elementsViewWrapper = element.querySelector(".elements-wrap").firstElementChild.shadowRoot;
-   const stylesPanelWrapper = element.querySelector(".style-panes-wrapper").firstElementChild.shadowRoot;
+      elementsViewWrapper.querySelectorAll(".webkit-html-attribute").forEach(patchElementsViewClassAttribute);
 
-   console.log(elementsViewWrapper);
-   console.log(stylesPanelWrapper);
-
-   elementsViewWrapper.querySelectorAll(".webkit-html-attribute").forEach(patchElementsViewClassAttribute);
-   stylesPanelWrapper.querySelectorAll(".simple-selector").forEach(patchStylesPanelSelector);
-
-   elementsViewObserver = new MutationObserver(function (mutations) {
-      for (const mutation of mutations) {
-         for (const node of mutation.addedNodes) {
-            if (node.nodeType !== Node.ELEMENT_NODE) {
-               continue;
-            }
-            if (node.classList.contains("webkit-html-attribute")) {
-               patchElementsViewClassAttribute(node);
-            } else {
-               node.querySelectorAll(".webkit-html-attribute").forEach(patchElementsViewClassAttribute);
+      elementsViewObserver = new MutationObserver(function (mutations) {
+         for (const mutation of mutations) {
+            for (const node of mutation.addedNodes) {
+               if (node.nodeType !== Node.ELEMENT_NODE) {
+                  continue;
+               }
+               if (node.classList.contains("webkit-html-attribute")) {
+                  patchElementsViewClassAttribute(node);
+               } else {
+                  node.querySelectorAll(".webkit-html-attribute").forEach(patchElementsViewClassAttribute);
+               }
             }
          }
+      });
+
+      elementsViewObserver.observe(elementsViewWrapper, { childList: true, subtree: true });
+   })();
+
+   (async function () {
+      stylesPanelWrapperP?.reject();
+      stylesPanelObserver?.disconnect();
+      let $ = element.querySelector(".style-panes-wrapper");
+      if (!$) {
+         stylesPanelWrapperP = waitForElement(".style-panes-wrapper", element, -1);
+         $ = await stylesPanelWrapperP.promise;
+         await new Promise(r => setTimeout(r));
       }
-   });
-   stylesPanelObserver = new MutationObserver(function (mutations) {
-      for (const mutation of mutations) {
-         for (const node of mutation.addedNodes) {
-            if (node.nodeType !== Node.ELEMENT_NODE) {
-               continue;
-            }
-            if (node.classList.contains("simple-selector")) {
-               patchStylesPanelSelector(node);
-            } else {
-               node.querySelectorAll(".simple-selector").forEach(patchStylesPanelSelector);
+      const stylesPanelWrapper = $.firstElementChild.shadowRoot;
+
+      stylesPanelWrapper.querySelectorAll(".simple-selector").forEach(patchStylesPanelSelector);
+
+      stylesPanelObserver = new MutationObserver(function (mutations) {
+         for (const mutation of mutations) {
+            for (const node of mutation.addedNodes) {
+               if (node.nodeType !== Node.ELEMENT_NODE) {
+                  continue;
+               }
+               if (node.classList.contains("simple-selector")) {
+                  patchStylesPanelSelector(node);
+               } else {
+                  node.querySelectorAll(".simple-selector").forEach(patchStylesPanelSelector);
+               }
             }
          }
-      }
-   });
+      });
 
-   elementsViewObserver.observe(elementsViewWrapper, { childList: true, subtree: true });
-   stylesPanelObserver.observe(stylesPanelWrapper, { childList: true, subtree: true });
+      stylesPanelObserver.observe(stylesPanelWrapper, { childList: true, subtree: true });
+   })();
 }
 
 async function init() {
@@ -140,10 +160,7 @@ async function init() {
          globalThis.REV_MAP = genRevMapCollect(globalThis.MAP);
       });
 
-   // TODO remove this
-   await new Promise(r => setTimeout(r, 3000));
-
-   const main = await waitForElement(".main-tabbed-pane", document, -1);
+   const main = await waitForElement(".main-tabbed-pane", document, -1).promise;
 
    const elementsPanel = main.querySelector('[aria-label="Elements panel"]');
    if (elementsPanel) {
