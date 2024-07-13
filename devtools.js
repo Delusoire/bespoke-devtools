@@ -1,3 +1,5 @@
+/// Utils
+
 function* genRevMap(map, id = []) {
    for (const [key, value] of Object.entries(map)) {
       nid = [...id, key];
@@ -50,7 +52,11 @@ function sleep(ms) {
    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-///
+function randomBit() {
+   return new Int32Array(new Float32Array([Math.random()]).buffer)[0] & 0b1;
+}
+
+/// Patching Inspector
 
 let elementsViewP, elementsViewObserver;
 let stylesPanelP, stylesPanelObserver;
@@ -232,7 +238,7 @@ function patchElementsPanel(element, MAP_CSS_CLASS, classmapStorage, isRefresh =
    })();
 }
 
-///
+/// JSON Storage
 
 function normalizeJson(json) {
    return JSON.stringify(JSON.parse(json));
@@ -376,23 +382,6 @@ class JsonStorage {
 
 /// init
 
-// globalThis.E = await import("devtools://devtools/bundled/panels/elements/elements.js");
-// globalThis.X = await import("devtools://devtools/bundled/models/extensions/extensions.js");
-// globalThis.L = await import("devtools://devtools/bundled/ui/legacy/legacy.js");
-// E.ElementsPanel.ElementsPanel = globalThis.Elements.ElementsPanel
-// E.ElementsPanel.ElementsPanel.instance().stylesWidget
-// E.ElementsSidebarPane.ElementsSidebarPane (this is parent of E.StylesSidebarPane.StylesSidebarPane, which is stylesWidget)
-
-// const extensionSidebarPane = new X.ExtensionPanel.ExtensionSidebarPane(
-//    X.ExtensionServer.ExtensionServer.instance(),
-//    panel,
-//    title,
-//    id,
-// )
-// E.ElementsPanel.ElementsPanel.instance().addExtensionSidebarPane(extensionSidebarPane)
-
-// L.ViewManager.registerViewExtension()
-
 async function init() {
    globalThis.MAP = null;
    globalThis.REV_MAP = null;
@@ -445,7 +434,3 @@ async function init() {
 if (location.protocol === "devtools:") {
    init();
 }
-
-// function randomBit() {
-//    return new Int32Array(new Float32Array([Math.random()]).buffer)[0] & 0b1
-// }
