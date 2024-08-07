@@ -92,7 +92,7 @@ function patchElementsPanel(element, MAP_CSS_CLASS, classmapStorage, isRefresh =
    }
 
    async function patchSidebar(sidebar) {
-      if (sidebar.querySelector("tabbed-pane-header-tab.classmap")) {
+      if (sidebar.querySelector(".tabbed-pane-header-tab.classmap")) {
          return;
       }
 
